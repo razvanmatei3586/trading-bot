@@ -41,6 +41,7 @@ Each entry has a GitHub **plain** link and a **CDN** fallback (use CDN if GitHub
 
 ## 📝 Documentation
 
+- `PRD.md` — [GitHub](https://github.com/razvanmatei3586/trading-bot/blob/main/PRD.md?plain=1) · [CDN](https://cdn.jsdelivr.net/gh/razvanmatei3586/trading-bot@main/PRD.md)
 - `README.md` — [GitHub](https://github.com/razvanmatei3586/trading-bot/blob/main/README.md?plain=1) · [CDN](https://cdn.jsdelivr.net/gh/razvanmatei3586/trading-bot@main/README.md)
 - `SUMMARY.md` — [GitHub](https://github.com/razvanmatei3586/trading-bot/blob/main/SUMMARY.md?plain=1) · [CDN](https://cdn.jsdelivr.net/gh/razvanmatei3586/trading-bot@main/SUMMARY.md)
 
