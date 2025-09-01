@@ -37,7 +37,6 @@ Each entry has a GitHub **plain** link and a **CDN** fallback (use CDN if GitHub
 
 ## ⚙️ Config
 
-- `.env` — [GitHub](https://github.com/razvanmatei3586/trading-bot/blob/main/.env?plain=1) · [CDN](https://cdn.jsdelivr.net/gh/razvanmatei3586/trading-bot@main/.env)
 - `.env.example` — [GitHub](https://github.com/razvanmatei3586/trading-bot/blob/main/.env.example?plain=1) · [CDN](https://cdn.jsdelivr.net/gh/razvanmatei3586/trading-bot@main/.env.example)
 
 ## 📝 Documentation
