@@ -3,12 +3,13 @@ name: Update SUMMARY.md
 on:
   push:
     branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  build:
+  update-summary:
     runs-on: ubuntu-latest
 
     steps:
@@ -16,6 +17,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # ensures the token from this job (with write perms) is used
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -31,3 +34,5 @@ jobs:
         with:
           commit_message: "chore(ci): auto-update SUMMARY.md"
           file_pattern: SUMMARY.md
+          # pushes back to the same branch that triggered the job
+          branch: ${{ github.ref_name }}
