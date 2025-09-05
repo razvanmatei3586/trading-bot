@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
 """
-Generate SUMMARY.md with dual links per file:
-- GitHub plain viewer (?plain=1)
-- jsDelivr CDN (fallback for reliable fetching)
+Generate SUMMARY.md with primary links to raw.githubusercontent.com.
+Also includes optional fallbacks (jsDelivr CDN and GitHub Pages) if you want them.
 
-Also:
-- Detects remote + branch automatically
+- Detects remote + branch automatically (works with SSH or HTTPS origins)
 - Skips typical build/venv/cache folders
 - Organizes files by categories
 """
 
 from __future__ import annotations
-import os
 import re
 import subprocess
 from pathlib import Path
@@ -50,9 +47,10 @@ def detect_remote_https() -> str:
         return f"https://github.com/{m.group(1)}"
     raise RuntimeError(f"Unsupported remote URL: {origin}")
 
-def detect_user_repo(base_https: str) -> str:
-    # base_https is https://github.com/<user>/<repo>
-    return base_https.rstrip("/").split("github.com/")[1]
+def detect_user_repo(base_https: str) -> tuple[str, str]:
+    # base_https like https://github.com/user/repo
+    user, repo = base_https.rstrip("/").split("/")[-2:]
+    return user, repo
 
 def detect_branch() -> str:
     try:
@@ -67,9 +65,14 @@ def detect_branch() -> str:
     except Exception:
         return "main"
 
+def detect_commit_sha() -> str:
+    try:
+        return run(["git", "rev-parse", "HEAD"])
+    except Exception:
+        return ""
+
 def should_ignore(path: Path) -> bool:
-    parts = set(path.parts)
-    return any(d in IGNORE_DIRS for d in parts)
+    return any(part in IGNORE_DIRS for part in path.parts)
 
 def glob_many(patterns: List[str]) -> List[Path]:
     out: List[Path] = []
@@ -82,69 +85,87 @@ def glob_many(patterns: List[str]) -> List[Path]:
 def rel(path: Path) -> str:
     return str(path.relative_to(REPO_ROOT)).replace("\\", "/")
 
-def make_github_plain(base_https: str, branch: str, relpath: str) -> str:
-    return f"{base_https}/blob/{branch}/{relpath}?plain=1"
+# ---- Link builders ----
 
-def make_jsdelivr_cdn(user_repo: str, branch: str, relpath: str) -> str:
-    return f"https://cdn.jsdelivr.net/gh/{user_repo}@{branch}/{relpath}"
+def make_raw_link(user: str, repo: str, branch: str, relpath: str) -> str:
+    # Primary link: raw.githubusercontent.com (branch-based)
+    return f"https://raw.githubusercontent.com/{user}/{repo}/{branch}/{relpath}"
 
-def build_index() -> tuple[str, str, str, Dict[str, List[Tuple[str, str, str]]]]:
+def make_raw_link_pinned(user: str, repo: str, sha: str, relpath: str) -> str:
+    # Optional immutable link pinned to the exact commit
+    return f"https://raw.githubusercontent.com/{user}/{repo}/{sha}/{relpath}"
+
+def make_jsdelivr_cdn(user: str, repo: str, branch: str, relpath: str) -> str:
+    # Optional CDN fallback
+    return f"https://cdn.jsdelivr.net/gh/{user}/{repo}@{branch}/{relpath}"
+
+def make_pages_link(user: str, repo: str, relpath: str) -> str:
+    # Optional GitHub Pages mirror (requires your Pages workflow/mirror script)
+    return f"https://{user}.github.io/{repo}/files/{relpath}"
+
+# -----------------------
+
+def build_index() -> tuple[str, str, str, str, Dict[str, List[Tuple[str, str, str, str]]]]:
     """
-    Returns (base_https, branch, user_repo, index) where:
-    index[section] = list of (relpath, github_plain_url, cdn_url)
+    Returns (user, repo, branch, sha, index) where:
+    index[section] = list of (relpath, raw_url, cdn_url, pages_url)
+    (CDN/Pages may be unused if you prefer only raw.)
     """
     base = detect_remote_https()
+    user, repo = detect_user_repo(base)
     branch = detect_branch()
-    user_repo = detect_user_repo(base)
-    index: Dict[str, List[Tuple[str, str, str]]] = {}
+    sha = detect_commit_sha()
+
+    index: Dict[str, List[Tuple[str, str, str, str]]] = {}
     seen: set[str] = set()
 
     for title, patterns in CATEGORIES:
-        files: List[Tuple[str, str, str]] = []
+        files: List[Tuple[str, str, str, str]] = []
         for p in glob_many(patterns):
             rp = rel(p)
             if rp in seen:
                 continue
             seen.add(rp)
-            gh = make_github_plain(base, branch, rp)
-            cdn = make_jsdelivr_cdn(user_repo, branch, rp)
-            files.append((rp, gh, cdn))
+            raw = make_raw_link(user, repo, branch, rp)
+            cdn = make_jsdelivr_cdn(user, repo, branch, rp)
+            pages = make_pages_link(user, repo, rp)
+            files.append((rp, raw, cdn, pages))
         if files:
             index[title] = files
-    return base, branch, user_repo, index
+    return user, repo, branch, sha, index
 
-def render_summary(base: str, branch: str, user_repo: str,
-                   index: Dict[str, List[Tuple[str, str, str]]]) -> str:
+def render_summary(user: str, repo: str, branch: str, sha: str,
+                   index: Dict[str, List[Tuple[str, str, str, str]]]) -> str:
     lines: List[str] = []
     lines.append("# Trading Bot – Project Summary\n")
-    lines.append("This document lists the main components of the project with direct links for quick review.\n")
-    lines.append("Each entry has a GitHub **plain** link and a **CDN** fallback (use CDN if GitHub is flaky).\n")
+    lines.append("Primary links use **raw.githubusercontent.com** (best for tools and programmatic reads).\n")
+    lines.append("Fallbacks are provided (CDN / Pages) in case a viewer blocks automated clients.\n")
     lines.append("\n---\n")
-    lines.append(f"- **Repo:** {base}\n")
+    lines.append(f"- **Repo:** https://github.com/{user}/{repo}\n")
     lines.append(f"- **Branch:** `{branch}`\n")
-    lines.append(f"- **CDN base:** https://cdn.jsdelivr.net/gh/{user_repo}@{branch}/\n")
+    if sha:
+        lines.append(f"- **Pinned commit:** `{sha}`  \n")
+        lines.append(f"  (Immutable raw example: https://raw.githubusercontent.com/{user}/{repo}/{sha}/PATH/TO/FILE)\n")
+    lines.append(f"- **CDN base:** https://cdn.jsdelivr.net/gh/{user}/{repo}@{branch}/\n")
+    lines.append(f"- **Pages base (if enabled):** https://{user}.github.io/{repo}/files/\n")
     lines.append("\n---\n")
 
-    # Preserve category order defined in CATEGORIES
+    # Preserve category order
     for title, _ in CATEGORIES:
         if title not in index:
             continue
         lines.append(f"\n## {title}\n")
-        for rp, gh, cdn in index[title]:
-            # Example: - path/to/file.py — [GitHub](...) · [CDN](...)
-            lines.append(f"- `{rp}` — [GitHub]({gh}) · [CDN]({cdn})")
+        for rp, raw, cdn, pages in index[title]:
+            # Example line with multiple links; trim if you only want raw
+            lines.append(f"- `{rp}` — [Raw]({raw}) · [CDN]({cdn}) · [Pages]({pages})")
 
     lines.append("\n---\n")
     lines.append("### 🔄 Notes\n")
-    lines.append("- This file is auto-generated; edit `scripts/generate_summary.py` to change grouping or link styles.\n")
-    lines.append("- For exact, immutable references, also share **commit permalinks** (press `Y` on any GitHub file page).\n")
+    lines.append("- This file is auto-generated; edit `scripts/generate_summary.py` to tweak grouping or links.\n")
+    lines.append("- Use **Raw** links for programmatic access. For immutable references, use the **pinned commit** raw URL.\n")
     return "\n".join(lines)
 
 def main():
-    base, branch, user_repo, idx = build_index()
-    out = render_summary(base, branch, user_repo, idx)
-    (REPO_ROOT / "SUMMARY.md").write_text(out, encoding="utf-8")
-    print("SUMMARY.md updated with GitHub + CDN links.")
-
-if __name__ == "__main__":
-    main()
+    user, repo, branch, sha, idx = build_index()
+    out = render_summary(user, repo, branch, sha, idx)
+    (REPO_ROOT / "SUMMARY.md").write_text(out, encoding="ut
