@@ -62,7 +62,7 @@ class AlpacaConfig:
         or os.getenv("ALPACA_API_KEY_ID", "")
     )
     secret: str = (
-        os.getenv("APCA-API-SECRET-KEY ")
+        os.getenv("APCA-API-SECRET-KEY")
         or os.getenv("ALPACA_API_SECRET_KEY", "")
     )
 
@@ -73,7 +73,7 @@ class AlpacaConfig:
     def validate(self):
         if not self.key_id or not self.secret:
             raise RuntimeError(
-                "Set APCA_API_KEY_ID and APCA_API_SECRET_KEY in your environment (or pass via CLI)."
+                "Set APCA-API-KEY-ID and APCA-API-SECRET-KEY in your environment (or pass via CLI)."
             )
         if self.feed not in ("iex", "sip"):
             raise RuntimeError("Feed must be 'iex' or 'sip'.")
