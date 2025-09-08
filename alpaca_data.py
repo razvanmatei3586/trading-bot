@@ -11,8 +11,8 @@ Alpaca Market Data v2 client (REST + WebSocket) for your trading-bot.
 
 ENV VARIABLES
 -------------
-ALPACA_API_KEY_ID        = your key id (required)
-ALPACA_API_SECRET_KEY    = your secret (required)
+APCA_API_KEY_ID        = your key id (required)
+APCA_API_SECRET_KEY    = your secret (required)
 ALPACA_DATA_FEED         = "iex" (default) or "sip"
 ALPACA_MAX_RPS           = max REST requests per second (default: 10)
 ALPACA_REST_BASE         = override REST base (default: https://data.alpaca.markets/v2)
@@ -52,20 +52,34 @@ from websocket import WebSocketApp
 
 # ---------- Config ----------
 
+from dataclasses import dataclass
+import os
+
 @dataclass
 class AlpacaConfig:
-    key_id: str = os.getenv("ALPACA_API_KEY_ID", "")
-    secret: str = os.getenv("ALPACA_API_SECRET_KEY", "")
-    feed: str = os.getenv("ALPACA_DATA_FEED", "iex")  # "iex" or "sip"
-    rest_base: str = os.getenv("ALPACA_REST_BASE", "https://data.alpaca.markets/v2")
-    ws_base: str = os.getenv("ALPACA_WS_BASE", "wss://stream.data.alpaca.markets/v2")
-    max_rps: float = float(os.getenv("ALPACA_MAX_RPS", "10"))  # throttle safeguard
+    # Prefer the official underscore envs; fall back to ALPACA_* if you used those earlier
+    key_id: str = (
+        os.getenv("APCA_API_KEY_ID")
+        or os.getenv("ALPACA_API_KEY_ID", "")
+    )
+    secret: str = (
+        os.getenv("APCA_API_SECRET_KEY")
+        or os.getenv("ALPACA_API_SECRET_KEY", "")
+    )
+    # Feed is not an official env; accept either APCA_DATA_FEED or ALPACA_DATA_FEED for convenience
+    feed: str = os.getenv("APCA_DATA_FEED") or os.getenv("ALPACA_DATA_FEED", "iex")  # "iex" or "sip"
+
+    rest_base: str = os.getenv("APCA_REST_BASE", "https://data.alpaca.markets/v2")
+    ws_base: str   = os.getenv("APCA_WS_BASE",   "wss://stream.data.alpaca.markets/v2")
+    max_rps: float = float(os.getenv("APCA_MAX_RPS", os.getenv("ALPACA_MAX_RPS", "10")))
 
     def validate(self):
         if not self.key_id or not self.secret:
-            raise RuntimeError("Set ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY in environment.")
+            raise RuntimeError(
+                "Set APCA_API_KEY_ID and APCA_API_SECRET_KEY in your environment (or pass via CLI)."
+            )
         if self.feed not in ("iex", "sip"):
-            raise RuntimeError("ALPACA_DATA_FEED must be 'iex' or 'sip'.")
+            raise RuntimeError("Feed must be 'iex' or 'sip'.")
 
 
 # ---------- Utilities ----------
@@ -378,6 +392,9 @@ def cli():
     p = argparse.ArgumentParser(description="Alpaca Market Data v2 client (REST + WS)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
+    # Global option (works before/after the subcommand)
+    p.add_argument("--feed", choices=["iex", "sip"], help="Data feed to use")
+
     # REST: bars
     p_bars = sub.add_parser("bars", help="Fetch multi-symbol bars")
     p_bars.add_argument("--symbols", required=True, help="Comma-separated symbols")
@@ -399,6 +416,8 @@ def cli():
 
     args = p.parse_args()
     cfg = AlpacaConfig()
+    if getattr(args, "feed", None):    
+        cfg.feed = args.feed
     cfg.validate()
 
     if args.cmd == "bars":
