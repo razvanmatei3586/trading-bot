@@ -11,8 +11,8 @@ Alpaca Market Data v2 client (REST + WebSocket) for your trading-bot.
 
 ENV VARIABLES
 -------------
-APCA-API-KEY-ID        = your key id (required)
-APCA-API-SECRET-KEY    = your secret (required)
+APCA_API_KEY_ID        = your key id (required)
+APCA_API_SECRET_KEY    = your secret (required)
 ALPACA_MAX_RPS           = max REST requests per second (default: 10)
 ALPACA_REST_BASE         = override REST base (default: https://data.alpaca.markets/v2)
 ALPACA_WS_BASE           = override WS base  (default: wss://stream.data.alpaca.markets/v2)
@@ -58,11 +58,11 @@ import os
 class AlpacaConfig:
     # Prefer the official underscore envs; fall back to ALPACA_* if you used those earlier
     key_id: str = (
-        os.getenv("APCA-API-KEY-ID")
+        os.getenv("APCA_API_KEY_ID")
         or os.getenv("ALPACA_API_KEY_ID", "")
     )
     secret: str = (
-        os.getenv("APCA-API-SECRET-KEY")
+        os.getenv("APCA_API_SECRET_KEY")
         or os.getenv("ALPACA_API_SECRET_KEY", "")
     )
 
@@ -73,7 +73,7 @@ class AlpacaConfig:
     def validate(self):
         if not self.key_id or not self.secret:
             raise RuntimeError(
-                "Set APCA-API-KEY-ID and APCA-API-SECRET-KEY in your environment (or pass via CLI)."
+                "Set APCA_API_KEY_ID and APCA_API_SECRET_KEY in your environment (or pass via CLI)."
             )
         if self.feed not in ("iex", "sip"):
             raise RuntimeError("Feed must be 'iex' or 'sip'.")
