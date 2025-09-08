@@ -11,9 +11,8 @@ Alpaca Market Data v2 client (REST + WebSocket) for your trading-bot.
 
 ENV VARIABLES
 -------------
-APCA_API_KEY_ID        = your key id (required)
-APCA_API_SECRET_KEY    = your secret (required)
-ALPACA_DATA_FEED         = "iex" (default) or "sip"
+APCA-API-KEY-ID        = your key id (required)
+APCA-API-SECRET-KEY    = your secret (required)
 ALPACA_MAX_RPS           = max REST requests per second (default: 10)
 ALPACA_REST_BASE         = override REST base (default: https://data.alpaca.markets/v2)
 ALPACA_WS_BASE           = override WS base  (default: wss://stream.data.alpaca.markets/v2)
@@ -59,15 +58,13 @@ import os
 class AlpacaConfig:
     # Prefer the official underscore envs; fall back to ALPACA_* if you used those earlier
     key_id: str = (
-        os.getenv("APCA_API_KEY_ID")
+        os.getenv("APCA-API-KEY-ID")
         or os.getenv("ALPACA_API_KEY_ID", "")
     )
     secret: str = (
-        os.getenv("APCA_API_SECRET_KEY")
+        os.getenv("APCA-API-SECRET-KEY ")
         or os.getenv("ALPACA_API_SECRET_KEY", "")
     )
-    # Feed is not an official env; accept either APCA_DATA_FEED or ALPACA_DATA_FEED for convenience
-    feed: str = os.getenv("APCA_DATA_FEED") or os.getenv("ALPACA_DATA_FEED", "iex")  # "iex" or "sip"
 
     rest_base: str = os.getenv("APCA_REST_BASE", "https://data.alpaca.markets/v2")
     ws_base: str   = os.getenv("APCA_WS_BASE",   "wss://stream.data.alpaca.markets/v2")
