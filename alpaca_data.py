@@ -48,7 +48,14 @@ import requests
 from dateutil import parser as dateparse
 from websocket import WebSocketApp
 
-
+# Auto-load .env if present
+try:
+    from pathlib import Path
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env")
+except Exception:
+    pass
+    
 # ---------- Config ----------
 
 from dataclasses import dataclass
