@@ -195,59 +195,73 @@ class AlpacaDataClient:
         return out.sort_values(["symbol", "t"]).reset_index(drop=True)
 
     # ---- Snapshots (multi-symbol) ----
-    def get_snapshots(
-        self,
-        symbols: List[str],
-        max_symbols_per_request: int = 50,
-    ) -> pd.DataFrame:
-        """
-        Multi-symbol snapshots: last trade, best bid/ask, today's OHLC, etc.
-        Returns tidy DataFrame with one row per symbol (where available).
-        """
-        symbols = sorted({s.strip().upper() for s in symbols if s.strip()})
-        rows: List[Dict] = []
 
-        for batch in _chunks(symbols, max_symbols_per_request):
-            params = {
-                "symbols": ",".join(batch),
-                "feed": self.cfg.feed,
-            }
-            data = self._get("/stocks/snapshots", params)
-            # shape: { "snapshots": { "AAPL": { "latestTrade": {...}, "latestQuote": {...}, "minuteBar": {...}, "dailyBar": {...}, ... }, ... } }
-            snaps = data.get("snapshots", {})
-            for sym, snap in snaps.items():
-                lt = snap.get("latestTrade") or {}
-                lq = snap.get("latestQuote") or {}
-                db = snap.get("dailyBar") or {}
-                mb = snap.get("minuteBar") or {}
-                rows.append({
-                    "symbol": sym,
-                    "trade_ts": lt.get("t"),
-                    "trade_px": lt.get("p"),
-                    "quote_ts": lq.get("t"),
-                    "bid_px": lq.get("bp"),
-                    "bid_sz": lq.get("bs"),
-                    "ask_px": lq.get("ap"),
-                    "ask_sz": lq.get("as"),
-                    "daily_o": db.get("o"),
-                    "daily_h": db.get("h"),
-                    "daily_l": db.get("l"),
-                    "daily_c": db.get("c"),
-                    "min_bar_t": mb.get("t"),
-                    "min_bar_c": mb.get("c"),
-                })
+def get_snapshots(
+    self,
+    symbols: List[str],
+    max_symbols_per_request: int = 50,
+) -> pd.DataFrame:
+    """
+    Multi-symbol snapshots: last trade, best bid/ask, today's OHLC, etc.
+    Returns tidy DataFrame with one row per symbol (where available).
+    """
+    symbols = sorted({s.strip().upper() for s in symbols if s.strip()})
+    rows: List[Dict] = []
 
-        if not rows:
-            return pd.DataFrame(columns=[
-                "symbol","trade_ts","trade_px","quote_ts","bid_px","bid_sz","ask_px","ask_sz",
-                "daily_o","daily_h","daily_l","daily_c","min_bar_t","min_bar_c"
-            ])
-        out = pd.DataFrame(rows)
-        # Parse timestamps if present
-        for col in ("trade_ts", "quote_ts", "min_bar_t"):
-            if col in out.columns:
-                out[col] = pd.to_datetime(out[col], utc=True, errors="coerce")
-        return out.sort_values("symbol").reset_index(drop=True)
+    for batch in _chunks(symbols, max_symbols_per_request):
+        params = {
+            "symbols": ",".join(batch),
+            "feed": self.cfg.feed,
+        }
+        data = self._get("/stocks/snapshots", params)
+
+        # Accept BOTH response shapes:
+        #   1) { "snapshots": { "AAPL": {...}, "MSFT": {...}, ... } }
+        #   2) { "AAPL": {...}, "MSFT": {...}, ... }
+        if isinstance(data, dict) and "snapshots" in data and isinstance(data["snapshots"], dict):
+            snaps = data["snapshots"]
+        elif isinstance(data, dict):
+            snaps = data
+        else:
+            snaps = {}
+
+        for sym, snap in snaps.items():
+            if not isinstance(snap, dict):
+                continue
+            lt = snap.get("latestTrade") or {}
+            lq = snap.get("latestQuote") or {}
+            db = snap.get("dailyBar") or {}
+            mb = snap.get("minuteBar") or {}
+            rows.append({
+                "symbol": sym,
+                "trade_ts": lt.get("t"),
+                "trade_px": lt.get("p"),
+                "quote_ts": lq.get("t"),
+                "bid_px": lq.get("bp"),
+                "bid_sz": lq.get("bs"),
+                "ask_px": lq.get("ap"),
+                "ask_sz": lq.get("as"),
+                "daily_o": db.get("o"),
+                "daily_h": db.get("h"),
+                "daily_l": db.get("l"),
+                "daily_c": db.get("c"),
+                "min_bar_t": mb.get("t"),
+                "min_bar_c": mb.get("c"),
+            })
+
+    if not rows:
+        # Helpful hint when nothing returned
+        return pd.DataFrame(columns=[
+            "symbol","trade_ts","trade_px","quote_ts","bid_px","bid_sz","ask_px","ask_sz",
+            "daily_o","daily_h","daily_l","daily_c","min_bar_t","min_bar_c"
+        ])
+
+    out = pd.DataFrame(rows)
+    # Parse timestamps if present
+    for col in ("trade_ts", "quote_ts", "min_bar_t"):
+        if col in out.columns:
+            out[col] = pd.to_datetime(out[col], utc=True, errors="coerce")
+    return out.sort_values("symbol").reset_index(drop=True)
 
 
 # ---------- WebSocket (real-time) ----------
